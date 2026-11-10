@@ -27,7 +27,7 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           BETTER_EMAIL: ${{ secrets.BETTER_EMAIL }}
           BETTER_PASSWORD: ${{ secrets.BETTER_PASSWORD }}
-          START_DATE: "2026-11-25"
+          START_DATE: "2026-11-10"
           EARLIEST_START: "19:00"
           LATEST_START: "21:00"
           NOTIFY_ONLY_HOURS: "4"
