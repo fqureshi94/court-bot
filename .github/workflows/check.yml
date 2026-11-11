@@ -11,7 +11,7 @@ on:
         default: false
 
 concurrency:
-  group: court-check
+  group: court-check-${{ inputs.test_alert && 'test' || 'main' }}
   cancel-in-progress: false
 
 permissions:
