@@ -2,9 +2,13 @@ name: Check Islington courts
 
 on:
   schedule:
-    - cron: "*/10 6-22 * * *"   # every 10 min, 06:00-22:59 UTC
-    - cron: "40 20,21 * * *"    # just before the 22:00 UK release (covers GMT and BST)
-  workflow_dispatch: {}          # lets you press "Run workflow" manually
+    - cron: "5 6,9,12,15,18 * * *"   # (re)starts the chain if it ever stops
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: "Just send a test alert to my phone"
+        type: boolean
+        default: false
 
 concurrency:
   group: court-check
@@ -12,11 +16,12 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,15 +32,30 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           BETTER_EMAIL: ${{ secrets.BETTER_EMAIL }}
           BETTER_PASSWORD: ${{ secrets.BETTER_PASSWORD }}
+          TEST_ALERT: ${{ inputs.test_alert }}
           START_DATE: "2026-11-10"
           EARLIEST_START: "19:00"
           LATEST_START: "21:00"
           NOTIFY_ONLY_HOURS: "4"
           AUTOBOOK: "true"
+          LOOP_MINUTES: "50"
+          POLL_SECONDS: "120"
         run: python checker.py
       - name: Save memory of what was already sent
+        if: ${{ !inputs.test_alert }}
         run: |
           git config user.name "court-bot"
           git config user.email "court-bot@users.noreply.github.com"
           git add state.json
-          git diff --cached --quiet || (git commit -m "update state" && git push)
+          git diff --cached --quiet || (git commit -m "update state" && git pull --rebase && git push)
+      - name: Start the next run (07:00-23:00 UK time only)
+        if: ${{ !inputs.test_alert }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HOUR=$(TZ=Europe/London date +%-H)
+          ACTIVE=$(gh run list --workflow check.yml --repo "$GITHUB_REPOSITORY" --limit 20 --json status --jq '[.[] | select(.status=="queued" or .status=="in_progress" or .status=="pending" or .status=="waiting")] | length')
+          echo "UK hour $HOUR, active runs $ACTIVE"
+          if [ "$HOUR" -ge 6 ] && [ "$HOUR" -lt 22 ] && [ "$ACTIVE" -le 1 ]; then
+            gh workflow run check.yml --repo "$GITHUB_REPOSITORY"
+          fi
