@@ -221,22 +221,32 @@ def check_once(state):
 
 
 def main():
+    if os.getenv("TEST_ALERT", "").lower() == "true":
+        notify("Court bot test", "If you can read this, alerts are working.",
+               SITE, priority="high", tags="white_check_mark")
+        return
+
     state = load_state()
-    now = datetime.now(LONDON)
-    # New days are released at 22:00 UK time. If this run starts shortly before,
-    # keep polling every 20s until 22:05 so we catch the release instantly.
-    release = now.replace(hour=22, minute=0, second=0, microsecond=0)
-    snipe = timedelta(minutes=-20) <= (now - release) <= timedelta(minutes=5)
-    deadline = release + timedelta(minutes=5) if snipe else now
+    start = datetime.now(LONDON)
+    # Keep checking for LOOP_MINUTES (GitHub's own schedule is too unreliable).
+    deadline = start + timedelta(minutes=float(os.getenv("LOOP_MINUTES", "0")))
+    poll = int(os.getenv("POLL_SECONDS", "120"))
+    # New days are released at 22:00 UK time: check every 20s from 21:57 to 22:05.
+    release = start.replace(hour=22, minute=0, second=0, microsecond=0)
     while True:
         try:
             check_once(state)
         except Exception as e:
             print(f"check failed: {e}")
         save_state(state)
-        if datetime.now(LONDON) >= deadline:
+        now = datetime.now(LONDON)
+        near_release = release - timedelta(minutes=3) <= now <= release + timedelta(minutes=5)
+        if now >= deadline and not near_release:
             break
-        time.sleep(20)
+        if not near_release and release - timedelta(minutes=3) - now < timedelta(seconds=poll) and now < release:
+            time.sleep(max(1, (release - timedelta(minutes=3) - now).total_seconds()))
+        else:
+            time.sleep(20 if near_release else poll)
 
 
 if __name__ == "__main__":
