@@ -56,6 +56,6 @@ jobs:
           HOUR=$(TZ=Europe/London date +%-H)
           ACTIVE=$(gh run list --workflow check.yml --repo "$GITHUB_REPOSITORY" --limit 20 --json status --jq '[.[] | select(.status=="queued" or .status=="in_progress" or .status=="pending" or .status=="waiting")] | length')
           echo "UK hour $HOUR, active runs $ACTIVE"
-          if [ "$HOUR" -ge 6 ] && [ "$HOUR" -lt 22 ] && [ "$ACTIVE" -le 1 ]; then
+          if [ "$ACTIVE" -le 1 ]; then
             gh workflow run check.yml --repo "$GITHUB_REPOSITORY"
           fi
