@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -43,13 +45,17 @@ jobs:
         run: python checker.py
       - name: Save memory of what was already sent
         if: ${{ !inputs.test_alert }}
+        continue-on-error: true
         run: |
           git config user.name "court-bot"
           git config user.email "court-bot@users.noreply.github.com"
+          cp state.json /tmp/state.json
+          git fetch origin main && git checkout -f -B main origin/main
+          cp /tmp/state.json state.json
           git add state.json
-          git diff --cached --quiet || (git commit -m "update state" && git pull --rebase && git push)
-      - name: Start the next run (07:00-23:00 UK time only)
-        if: ${{ !inputs.test_alert }}
+          git diff --cached --quiet || (git commit -m "update state" && git push)
+      - name: Start the next run
+        if: ${{ always() && !inputs.test_alert }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
